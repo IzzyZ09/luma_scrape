@@ -1,3 +1,4 @@
+# WORK IN PROGRESS
 import csv
 from playwright.sync_api import sync_playwright
 
@@ -5,14 +6,14 @@ def scrape_luma(event_url):
     rows = [['Name', 'Profile URL', 'LinkedIn']]
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)  # Change to True to run invisibly
+        browser = p.chromium.launch(headless=False)
         context = browser.new_context()
         page = context.new_page()
 
         print(f"🔗 Opening event: {event_url}")
         page.goto(event_url)
 
-        # Step 1: Click the guest list button ("93 others")
+        # click guest list button, WIP
         try:
             more_btn = page.locator("button.guests-button")
             if more_btn.is_visible():
@@ -24,7 +25,7 @@ def scrape_luma(event_url):
         except Exception as e:
             print("⚠️ Could not click guest list button:", e)
 
-        # Step 2: Grab attendee links
+        # get attendee links
         print("🔍 Collecting attendee links...")
         attendee_links = page.locator('a[href^="/user/"]')
         count = attendee_links.count()
@@ -47,7 +48,7 @@ def scrape_luma(event_url):
 
         print(f"✅ Found {len(attendees)} unique attendees.")
 
-        # Step 3: Visit each profile and grab LinkedIn
+        # get linkedin links
         for person in attendees:
             print(f"🌐 Visiting: {person['name']}")
             try:
@@ -70,14 +71,13 @@ def scrape_luma(event_url):
 
         browser.close()
 
-    # Step 4: Save CSV
+    # download CSV file
     with open('luma_attendees_linkedin_only.csv', 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
         writer.writerows(rows)
 
     print("📁 Done! Saved as luma_attendees_linkedin_only.csv")
 
-# Run it
 if __name__ == "__main__":
     event_url = input("Paste the full Luma event URL: ").strip()
     scrape_luma(event_url)
