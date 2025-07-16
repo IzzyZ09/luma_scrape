@@ -1,5 +1,5 @@
 (async function() {
-  // 1. Collect attendee links and deduplicate by profile URL
+  // get profile links
   const attendeeLinks = Array.from(document.querySelectorAll('a[href^="/user/"]'));
   const seen = new Set();
   const attendees = [];
@@ -13,67 +13,39 @@
     });
   }
 
-  // 2. Helper to fetch and parse social links from a profile page
-  async function getSocialLinks(profileUrl) {
+  // get linkedin
+  async function getLinkedIn(profileUrl) {
     try {
       const res = await fetch(profileUrl, { credentials: 'include' });
       const html = await res.text();
       const doc = new DOMParser().parseFromString(html, 'text/html');
-      const socialLinks = Array.from(doc.querySelectorAll('.social-links a'));
-      const result = {
-        instagram: '',
-        x: '',
-        tiktok: '',
-        linkedin: '',
-        website: ''
-      };
-      for (const a of socialLinks) {
-        const href = a.href;
-        if (/instagram\.com/i.test(href)) result.instagram = href;
-        else if (/twitter\.com|x\.com/i.test(href)) result.x = href;
-        else if (/tiktok\.com/i.test(href)) result.tiktok = href;
-        else if (/linkedin\.com/i.test(href)) result.linkedin = href;
-        else if (!/lumacdn\.com|lu\.ma/i.test(href)) result.website = href; // fallback for personal website
-      }
-      return result;
+      const link = Array.from(doc.querySelectorAll('.social-links a')).find(a => /linkedin\.com/i.test(a.href));
+      return link ? link.href : '';
     } catch (e) {
-      return {
-        instagram: '',
-        x: '',
-        tiktok: '',
-        linkedin: '',
-        website: ''
-      };
+      console.error(`Error fetching ${profileUrl}:`, e);
+      return '';
     }
   }
 
-  // 3. Process all attendees, one at a time to avoid rate limits
-  const rows = [
-    ['Name', 'Profile URL', 'Instagram', 'X', 'TikTok', 'LinkedIn', 'Website']
-  ];
+  // go through each attendee
+  const rows = [['Name', 'Profile URL', 'LinkedIn']];
   for (const attendee of attendees) {
-    const socials = await getSocialLinks(attendee.profileUrl);
-    rows.push([
-      attendee.name,
-      attendee.profileUrl,
-      socials.instagram,
-      socials.x,
-      socials.tiktok,
-      socials.linkedin,
-      socials.website
-    ]);
-    // Optional: show progress
-    console.log(`Processed: ${attendee.name}`);
-    await new Promise(r => setTimeout(r, 500)); // polite delay
+    const linkedin = await getLinkedIn(attendee.profileUrl);
+    if (linkedin) {
+      rows.push([attendee.name, attendee.profileUrl, linkedin]);
+      console.log(`✅ Yes LinkedIn: ${attendee.name}`);
+    } else {
+      console.log(`❌ No LinkedIn: ${attendee.name}`);
+    }
   }
 
-  // 4. Download as CSV
-  const csv = rows.map(r => r.map(x => `"${(x||'').replace(/"/g, '""')}"`).join(',')).join('\n');
-  const blob = new Blob([csv], {type: 'text/csv'});
+  // download CSV file
+  const csv = rows.map(r => r.map(x => `"${(x || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'luma_attendees_with_socials.csv';
+  a.download = 'luma_attendees_linkedin.csv';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-})(); 
+})();
