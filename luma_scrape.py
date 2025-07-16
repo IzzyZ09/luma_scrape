@@ -5,25 +5,24 @@ def scrape_luma(event_url):
     rows = [['Name', 'Profile URL', 'LinkedIn']]
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)  # set to True to run invisibly
+        browser = p.chromium.launch(headless=False)  # Change to True to run invisibly
         context = browser.new_context()
         page = context.new_page()
 
         print(f"🔗 Opening event: {event_url}")
         page.goto(event_url)
 
-        # Step 1: Click "See more" until all attendees are shown
-        while True:
-            try:
-                more_btn = page.locator("button", has_text="See more")
-                if more_btn.is_visible():
-                    print("📌 Clicking 'See more'")
-                    more_btn.click()
-                    page.wait_for_timeout(1000)
-                else:
-                    break
-            except:
-                break
+        # Step 1: Click the guest list button ("93 others")
+        try:
+            more_btn = page.locator("button.guests-button")
+            if more_btn.is_visible():
+                print("📌 Clicking guest list to expand attendees...")
+                more_btn.click()
+                page.wait_for_timeout(2000)
+            else:
+                print("⚠️ Guest list button not visible.")
+        except Exception as e:
+            print("⚠️ Could not click guest list button:", e)
 
         # Step 2: Grab attendee links
         print("🔍 Collecting attendee links...")
@@ -58,7 +57,7 @@ def scrape_luma(event_url):
                 linkedin = ''
                 for j in range(social_links.count()):
                     link = social_links.nth(j).get_attribute('href')
-                    if 'linkedin.com' in link:
+                    if link and 'linkedin.com' in link:
                         linkedin = link
                         break
                 if linkedin:
@@ -66,8 +65,8 @@ def scrape_luma(event_url):
                     print(f"🔗 LinkedIn: {linkedin}")
                 else:
                     print("❌ No LinkedIn found.")
-            except:
-                print("⚠️ Error loading profile.")
+            except Exception as e:
+                print(f"⚠️ Error visiting {person['profileUrl']}: {e}")
 
         browser.close()
 
