@@ -13,7 +13,7 @@
     });
   }
 
-  // get linkedin
+  // get linkedin links
   async function getLinkedIn(profileUrl) {
     try {
       const res = await fetch(profileUrl, { credentials: 'include' });
@@ -33,9 +33,9 @@
     const linkedin = await getLinkedIn(attendee.profileUrl);
     if (linkedin) {
       rows.push([attendee.name, attendee.profileUrl, linkedin]);
-      console.log(`✅ Yes LinkedIn: ${attendee.name}`);
+      console.log(`Yes LinkedIn: ${attendee.name}`);
     } else {
-      console.log(`❌ No LinkedIn: ${attendee.name}`);
+      console.log(`No LinkedIn: ${attendee.name}`);
     }
   }
 
