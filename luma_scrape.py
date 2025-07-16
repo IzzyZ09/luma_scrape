@@ -1,56 +1,84 @@
-import requests
-from bs4 import BeautifulSoup
 import csv
+from playwright.sync_api import sync_playwright
 
-# input luma event URL
-BASE_URL = input("Enter the Luma event URL (e.g. https://lu.ma/my-event): ").strip()
-
-def get_attendees(event_url):
-    res = requests.get(event_url)
-    soup = BeautifulSoup(res.text, 'html.parser')
-    seen = set()
-    attendees = []
-    for link in soup.select('a[href^="/user/"]'):
-        href = link.get('href')
-        url = href if href.startswith('http') else 'https://lu.ma' + href
-        if url in seen:
-            continue
-        seen.add(url)
-        attendees.append({
-            'name': link.get_text(strip=True),
-            'profileUrl': url
-        })
-    return attendees
-
-def get_linkedin(profile_url):
-    try:
-        res = requests.get(profile_url)
-        soup = BeautifulSoup(res.text, 'html.parser')
-        social_links = soup.select('.social-links a')
-        for a in social_links:
-            href = a.get('href', '')
-            if 'linkedin.com' in href:
-                return href
-        return ''
-    except Exception:
-        return ''
-
-def main():
-    attendees = get_attendees(BASE_URL)
+def scrape_luma(event_url):
     rows = [['Name', 'Profile URL', 'LinkedIn']]
-    for attendee in attendees:
-        linkedin = get_linkedin(attendee['profileUrl'])
-        if linkedin:
-            rows.append([attendee['name'], attendee['profileUrl'], linkedin])
-            print(f"✅ Yes LinkedIn: {attendee['name']}")
-        else:
-            print(f"❌ No LinkedIn: {attendee['name']}")
 
-    with open('luma_attendees_linkedin.csv', 'w', newline='', encoding='utf-8') as f:
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=False)  # set to True to run invisibly
+        context = browser.new_context()
+        page = context.new_page()
+
+        print(f"🔗 Opening event: {event_url}")
+        page.goto(event_url)
+
+        # Step 1: Click "See more" until all attendees are shown
+        while True:
+            try:
+                more_btn = page.locator("button", has_text="See more")
+                if more_btn.is_visible():
+                    print("📌 Clicking 'See more'")
+                    more_btn.click()
+                    page.wait_for_timeout(1000)
+                else:
+                    break
+            except:
+                break
+
+        # Step 2: Grab attendee links
+        print("🔍 Collecting attendee links...")
+        attendee_links = page.locator('a[href^="/user/"]')
+        count = attendee_links.count()
+        print(f"Found {count} attendees.")
+
+        seen = set()
+        attendees = []
+
+        for i in range(count):
+            link = attendee_links.nth(i)
+            href = link.get_attribute("href")
+            name = link.inner_text().strip()
+            full_url = href if href.startswith("http") else "https://lu.ma" + href
+            if full_url not in seen:
+                seen.add(full_url)
+                attendees.append({
+                    "name": name,
+                    "profileUrl": full_url
+                })
+
+        print(f"✅ Found {len(attendees)} unique attendees.")
+
+        # Step 3: Visit each profile and grab LinkedIn
+        for person in attendees:
+            print(f"🌐 Visiting: {person['name']}")
+            try:
+                page.goto(person["profileUrl"])
+                page.wait_for_timeout(800)
+                social_links = page.locator('.social-links a')
+                linkedin = ''
+                for j in range(social_links.count()):
+                    link = social_links.nth(j).get_attribute('href')
+                    if 'linkedin.com' in link:
+                        linkedin = link
+                        break
+                if linkedin:
+                    rows.append([person["name"], person["profileUrl"], linkedin])
+                    print(f"🔗 LinkedIn: {linkedin}")
+                else:
+                    print("❌ No LinkedIn found.")
+            except:
+                print("⚠️ Error loading profile.")
+
+        browser.close()
+
+    # Step 4: Save CSV
+    with open('luma_attendees_linkedin_only.csv', 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
         writer.writerows(rows)
 
-    print("✅ CSV saved as luma_attendees_linkedin.csv")
+    print("📁 Done! Saved as luma_attendees_linkedin_only.csv")
 
+# Run it
 if __name__ == "__main__":
-    main()
+    event_url = input("Paste the full Luma event URL: ").strip()
+    scrape_luma(event_url)
