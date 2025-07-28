@@ -33,7 +33,7 @@ const fs = require('fs');
     }
   };
 
-  const batchSize = 5; // how many profiles to scrape in parallel
+  const batchSize = 5; // how many profiles to scrape in each batch
   for (let i = 0; i < urls.length; i += batchSize) {
     const batch = urls.slice(i, i + batchSize);
     await Promise.all(batch.map(scrapeProfile));
