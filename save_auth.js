@@ -6,11 +6,11 @@ const { chromium } = require('playwright');
   const page = await context.newPage();
 
   await page.goto('https://www.linkedin.com/login');
-  console.log('🧠 Log into LinkedIn — take your time!');
+  console.log('Log into LinkedIn');
 
   await page.waitForTimeout(60000); // 60 sec to log in manually
 
   await context.storageState({ path: 'auth.json' }); // saves login
-  console.log('✅ Login saved!');
+  console.log('Login saved');
   await browser.close();
 })();
